@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -59,8 +60,14 @@ if (uploadDir && uploadDir !== localUploads) {
 }
 
 // Root landing endpoint
-app.get('/', (req, res) => {
-  const isDbConnected = mongoose.connection.readyState === 1;
+app.get('/', async (req, res) => {
+  let isDbConnected = mongoose.connection.readyState === 1;
+  if (!isDbConnected && process.env.MONGO_URI) {
+    try {
+      await connectDB();
+      isDbConnected = mongoose.connection.readyState === 1;
+    } catch (_) {}
+  }
   res.status(200).json({
     name: 'DreamPay Backend API',
     status: 'online',
@@ -72,8 +79,14 @@ app.get('/', (req, res) => {
 });
 
 // Health check route
-app.get('/health', (req, res) => {
-  const isDbConnected = mongoose.connection.readyState === 1;
+app.get('/health', async (req, res) => {
+  let isDbConnected = mongoose.connection.readyState === 1;
+  if (!isDbConnected && process.env.MONGO_URI) {
+    try {
+      await connectDB();
+      isDbConnected = mongoose.connection.readyState === 1;
+    } catch (_) {}
+  }
   res.status(200).json({
     status: 'OK',
     message: 'DreamPay Backend API is running smoothly',
