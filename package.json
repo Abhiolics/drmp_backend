@@ -1,0 +1,38 @@
+{
+  "name": "drmp_backend",
+  "version": "1.0.0",
+  "description": "DreamPay (DRMP) Backend API with Node.js, Express, MongoDB and Mongoose",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node src/scripts/smokeTest.js"
+  },
+  "keywords": [
+    "express",
+    "mongodb",
+    "mongoose",
+    "jwt",
+    "api",
+    "dreampay",
+    "drmp"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^1.41.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "multer-storage-cloudinary": "^4.0.0",
+    "nodemailer": "^10.0.10"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}

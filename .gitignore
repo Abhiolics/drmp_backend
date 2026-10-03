@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment variables (CRITICAL: contains secrets, passwords, tokens)
+.env
+.env.local
+.env.*.local
+
+# File uploads & temporary media
+uploads/
+scratch/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
