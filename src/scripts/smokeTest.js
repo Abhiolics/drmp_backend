@@ -67,24 +67,38 @@ const runSmokeTest = async () => {
 
     // 2. Admin Login
     console.log('\n[2/12] Testing Admin Login...');
-    const adminLogin = await makeRequest(
+    // Admin login is strictly OTP-based
+    const adminEmail = (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL.trim()) || 'abhisheksingh03674@gmail.com';
+    const adminOtpSendRes = await makeRequest(
       {
         hostname: 'localhost',
         port: PORT,
-        path: '/api/auth/login',
+        path: '/api/admin/send-otp',
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       },
-      {
-        email: (process.env.ADMIN_EMAIL && process.env.ADMIN_EMAIL.trim()) || 'abhisheksingh03674@gmail.com',
-        password: process.env.ADMIN_PASSWORD || 'Admin@123',
-      }
+      { email: adminEmail }
     );
-    if (adminLogin.status !== 200 || !adminLogin.body.token) {
-      throw new Error(`Admin login failed: ${JSON.stringify(adminLogin.body)}`);
+    if (adminOtpSendRes.status !== 200) {
+      throw new Error(`Admin send-otp failed: ${JSON.stringify(adminOtpSendRes.body)}`);
     }
-    const adminToken = adminLogin.body.token;
-    console.log('✅ Admin Login passed! Role:', adminLogin.body.data.role);
+
+    const adminOtp = adminOtpSendRes.body.otp;
+    const adminVerifyRes = await makeRequest(
+      {
+        hostname: 'localhost',
+        port: PORT,
+        path: '/api/admin/verify-otp',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      },
+      { email: adminEmail, otp: adminOtp }
+    );
+    if (adminVerifyRes.status !== 200 || !adminVerifyRes.body.token) {
+      throw new Error(`Admin verify-otp failed: ${JSON.stringify(adminVerifyRes.body)}`);
+    }
+    const adminToken = adminVerifyRes.body.token;
+    console.log('✅ Admin OTP Login passed! Role:', adminVerifyRes.body.data.role);
 
     // 3. User Registration
     console.log('\n[3/12] Testing User Registration...');
@@ -255,7 +269,8 @@ const runSmokeTest = async () => {
     // 8. Deposit Creation with Proof and Admin Approval
     console.log('\n[8/12] Testing Deposit Flow with Multipart Upload & Approval...');
     const boundary = '----WebKitFormBoundary' + Math.random().toString(16).slice(2);
-    const dummyImageContent = Buffer.from('fake-image-bytes-data');
+    // Valid 1x1 transparent PNG buffer for Cloudinary validation
+    const dummyImageContent = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
     let multipartBody = [
       `--${boundary}\r\nContent-Disposition: form-data; name="planId"\r\n\r\n${planId}\r\n`,
       `--${boundary}\r\nContent-Disposition: form-data; name="transactionRef"\r\n\r\nTXN_${randomId}\r\n`,
