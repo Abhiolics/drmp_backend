@@ -26,6 +26,7 @@ const settingSchema = new mongoose.Schema(
       qrCode: {
         enabled: { type: Boolean, default: true },
         imageUrl: { type: String, default: '' },
+        upiId: { type: String, default: '' },
       },
       bankAccount: {
         enabled: { type: Boolean, default: true },
@@ -35,6 +36,14 @@ const settingSchema = new mongoose.Schema(
         ifscCode: { type: String, default: '' },
         upiId: { type: String, default: '' },
       },
+    },
+    isUpiEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    isBankEnabled: {
+      type: Boolean,
+      default: true,
     },
   },
   {

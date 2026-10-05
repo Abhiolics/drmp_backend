@@ -1,4 +1,6 @@
 const Setting = require('../models/Setting');
+const PaymentMethod = require('../models/PaymentMethod');
+const { getPaymentMethodsPublic } = require('./paymentMethodController');
 
 // @desc    Get public application settings (Maintenance, update control)
 // @route   GET /api/app/settings or /app/settings
@@ -25,18 +27,7 @@ exports.getPublicSettings = async (req, res, next) => {
 // @desc    Get public active payment methods (QR code, bank details)
 // @route   GET /api/payment-methods or /payment-methods
 // @access  Public
-exports.getPaymentMethods = async (req, res, next) => {
-  try {
-    const settings = await Setting.getSettings();
-
-    res.status(200).json({
-      success: true,
-      data: settings.paymentMethods,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+exports.getPaymentMethods = getPaymentMethodsPublic;
 
 // @desc    Get full settings (Admin)
 // @route   GET /api/admin/settings or /admin/settings
@@ -125,6 +116,19 @@ exports.updatePaymentMethods = async (req, res, next) => {
         ...settings.paymentMethods.qrCode,
         ...qrCode,
       };
+
+      if (qrCode.upiId) {
+        await PaymentMethod.findOneAndUpdate(
+          { type: 'upi' },
+          {
+            type: 'upi',
+            upiId: qrCode.upiId.trim(),
+            qrCodeUrl: qrCode.imageUrl || '',
+            enabled: qrCode.enabled !== undefined ? qrCode.enabled : true,
+          },
+          { upsert: true, new: true }
+        );
+      }
     }
 
     if (bankAccount) {
@@ -132,6 +136,21 @@ exports.updatePaymentMethods = async (req, res, next) => {
         ...settings.paymentMethods.bankAccount,
         ...bankAccount,
       };
+
+      if (bankAccount.accountNumber) {
+        await PaymentMethod.findOneAndUpdate(
+          { type: 'bank' },
+          {
+            type: 'bank',
+            accountHolderName: bankAccount.accountHolder || 'Admin Payee',
+            bankName: bankAccount.bankName || 'Bank',
+            accountNumber: bankAccount.accountNumber.trim(),
+            ifscCode: (bankAccount.ifscCode || '').trim().toUpperCase(),
+            enabled: bankAccount.enabled !== undefined ? bankAccount.enabled : true,
+          },
+          { upsert: true, new: true }
+        );
+      }
     }
 
     await settings.save();

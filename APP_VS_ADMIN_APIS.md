@@ -155,7 +155,13 @@ These endpoints are strictly for the **Admin Dashboard** to manage users, approv
 | `GET` | `/api/admin/settings` | Get full platform settings (maintenance, app version, payment details) | None |
 | `PUT` | `/api/admin/settings/maintenance` | Turn maintenance mode on/off and customize user notice | Body: `{ "maintenanceMode": true, "maintenanceMessage": "Under scheduled maintenance" }` |
 | `PUT` | `/api/admin/settings/update-control` | Update latest version number and toggle forced app upgrade | Body: `{ "forceUpdate": true, "updateMessage": "Please update to v1.2", "currentVersion": "1.2.0" }` |
-| `PUT` | `/api/admin/settings/payment` | Update the deposit bank account and QR Code image URL | Body: `{ "qrCode": { "imageUrl": "...", "upiId": "..." }, "bankAccount": { ... } }` |
+| `PUT` | `/api/admin/settings/payment` | Update legacy deposit bank account and QR Code image URL | Body: `{ "qrCode": { "imageUrl": "...", "upiId": "..." }, "bankAccount": { ... } }` |
+| `GET` | `/api/payment/admin/payment-methods` | List all configured UPI and Bank payment methods (Admin) | None |
+| `POST` | `/api/payment/admin/payment-methods` | Add new UPI VPA or Bank Account payment method (Admin) | Body: `{ "type": "upi", "upiId": "merchant@hdfc", "upiPayeeName": "DreamPay", "enabled": true }` or `{ "type": "bank", "accountHolderName": "DreamPay", "bankName": "HDFC Bank", "accountNumber": "1234567890", "ifscCode": "HDFC0001234", "enabled": true }` |
+| `PUT` | `/api/payment/admin/payment-methods/:id` | Update existing UPI or Bank Account payment method (Admin) | Body: updated fields |
+| `DELETE` | `/api/payment/admin/payment-methods/:id` | Remove a payment method (Admin) | URL parameter `id` |
+| `PUT` | `/api/payment/admin/payment-methods/enable` | Global toggle for UPI or Bank methods (Admin) | Body: `{ "type": "upi" \| "bank", "enabled": true }` |
+| `GET` | `/api/upi/admin/all` | List all registered user UPI addresses in directory (Admin) | None |
 
 ### 9. Support Contacts Management
 | Method | Endpoint | Description | Payload / Parameters |

@@ -10,6 +10,8 @@ const withdrawalRoutes = require('./withdrawalRoutes');
 const taskRoutes = require('./taskRoutes');
 const walletRoutes = require('./walletRoutes');
 const notificationRoutes = require('./notificationRoutes');
+const paymentMethodRoutes = require('./paymentMethodRoutes');
+const upiRoutes = require('./upiRoutes');
 const { getPublicSettings, getPaymentMethods } = require('../controllers/settingController');
 const { getContacts } = require('../controllers/contactController');
 
@@ -23,6 +25,9 @@ router.use('/withdrawals', withdrawalRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/wallet', walletRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/payment', paymentMethodRoutes);
+router.use('/payment-methods', paymentMethodRoutes);
+router.use('/upi', upiRoutes);
 
 // Public app endpoints from settings folder
 router.get('/app/settings', getPublicSettings);

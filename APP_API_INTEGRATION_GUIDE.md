@@ -1,38 +1,67 @@
-# DreamPay (DRMP) Mobile App - API Integration Guide
+# 📱 DreamPay (DRMP) Mobile App — API Integration Guide
 
-This guide is specifically created for the **Mobile App Developer** (React Native / Expo / Flutter) to integrate all client-facing APIs smoothly.
-
----
-
-## 🌐 Server Base URL & Setup
-
-| Environment | Base URL |
-| :--- | :--- |
-| **Production / Hosted Server** | `https://gdpebackend.vercel.app` |
-| **API Path Prefix** | `https://gdpebackend.vercel.app/api` |
-| **Media / Uploads Base URL** | `https://gdpebackend.vercel.app` |
-
-> **Note on Uploaded Files:** All uploaded images (payment proof screenshots, task proofs, QR codes) are returned with relative paths like `/uploads/1727170000000-image.jpg`. To display them in the app, prepend the base URL:  
-> `https://gdpebackend.vercel.app/uploads/1727170000000-image.jpg`
+This guide is designed for the **Mobile App Developers** (React Native, Expo, Flutter, Kotlin/Android, Swift/iOS) to integrate all client-facing APIs smoothly and reliably.
 
 ---
 
-## 🔑 Authentication & Headers
+## 📑 Table of Contents
 
-For all protected routes, include the JWT token returned from registration or login in the request headers:
+1. [Base URLs & Environment Setup](#1-base-urls--environment-setup)
+2. [Authentication & Request Headers](#2-authentication--request-headers)
+3. [Standard Response & Error Formats](#3-standard-response--error-formats)
+4. [App Startup & System Config](#4-app-startup--system-config)
+5. [Authentication & Profile](#5-authentication--profile)
+6. [Membership Plans](#6-membership-plans)
+7. [Gift Codes](#7-gift-codes)
+8. [Deposits (Money In)](#8-deposits-money-in)
+9. [Withdrawals (Money Out)](#9-withdrawals-money-out)
+10. [Daily Tasks & Earnings](#10-daily-tasks--earnings)
+11. [Wallet & Passbook Ledger](#11-wallet--passbook-ledger)
+12. [In-App Notifications](#12-in-app-notifications)
+13. [Ready-to-Use React Native / Expo Code Samples](#13-ready-to-use-react-native--expo-code-samples)
+14. [Mobile Integration Tips & Common Gotchas](#14-mobile-integration-tips--common-gotchas)
+
+---
+
+## 1. Base URLs & Environment Setup
+
+The backend is configured with dual-routing: you can use either `/api/<endpoint>` or `/<endpoint>`. For clean architecture, using the `/api/` prefix is recommended.
+
+| Environment | Base URL | API Prefix | Notes |
+| :--- | :--- | :--- | :--- |
+| **Production (Vercel)** | `https://drmpbackend.vercel.app` | `https://drmpbackend.vercel.app/api` | Live production cloud |
+| **Local (iOS Simulator / Web)** | `http://localhost:5003` | `http://localhost:5003/api` | Mac / iOS Simulator |
+| **Local (Android Emulator)** | `http://10.0.2.2:5003` | `http://10.0.2.2:5003/api` | Standard Android AVD host alias |
+| **Physical Device (Expo Go)** | `http://<YOUR_MAC_IP>:5003` | `http://<YOUR_MAC_IP>:5003/api` | e.g. `http://192.168.1.15:5003/api` |
+
+> 🖼️ **Media & Image URLs:**
+> - Uploaded proofs (payment screenshots, task proofs) are uploaded to **Cloudinary** and return **full HTTPS URLs** (e.g. `https://res.cloudinary.com/...`).
+> - For any legacy or locally served asset, the backend serves from `/uploads/...`.
+> - Use the [Image URL Helper](#3-image-url-helper) below to safely display images regardless of origin.
+
+---
+
+## 2. Authentication & Request Headers
+
+### JSON Requests (Default)
+Include the JWT token received during login/register for all protected endpoints:
 
 ```http
-Authorization: Bearer <YOUR_JWT_TOKEN>
+Authorization: Bearer <USER_JWT_TOKEN>
 Content-Type: application/json
+Accept: application/json
 ```
 
-For file upload endpoints (`/api/deposits` and `/api/tasks/:id/submit`), use `multipart/form-data` (in Axios / Fetch, do **not** set the `Content-Type` header manually; allow `FormData` to set its boundary automatically).
+### File Upload Requests (Multipart)
+For uploading deposit screenshots (`/api/deposits`) and task proofs (`/api/tasks/:id/submit`):
+- Use `multipart/form-data`.
+- **Do not** manually hardcode the `Content-Type` header in your HTTP client (Axios/Fetch). Let your runtime set the multipart boundary automatically.
 
 ---
 
-## 📦 Standard API Response Formats
+## 3. Standard Response & Error Formats
 
-### Success Response
+### Standard Success Response (`200 OK` / `201 Created`)
 ```json
 {
   "success": true,
@@ -41,40 +70,56 @@ For file upload endpoints (`/api/deposits` and `/api/tasks/:id/submit`), use `mu
 }
 ```
 
-### Error Response (HTTP 400, 401, 403, 404, 500)
+### Standard Error Response (`400`, `401`, `403`, `404`, `500`)
 ```json
 {
   "success": false,
-  "message": "Error description here"
+  "message": "Clear error explanation for user"
+}
+```
+
+### Common HTTP Status Codes
+| Code | Meaning | Action Needed in App |
+| :--- | :--- | :--- |
+| `200` | OK | Parse response data |
+| `201` | Created | Resource successfully created |
+| `400` | Bad Request | Display `message` in toast/banner |
+| `401` | Unauthorized | Clear stored token & redirect to Login screen |
+| `403` | Forbidden / Blocked | Account blocked or restricted; alert user |
+| `404` | Not Found | Resource or route does not exist |
+| `500` | Server Error | Generic error prompt ("Please try again later") |
+
+---
+
+## 4. App Startup & System Config
+
+Call these endpoints when the app initializes (Splash Screen or App Launch) before loading core screens.
+
+---
+
+### 4.1 Server Health Ping
+- **Endpoint:** `GET /health` or `GET /`
+- **Auth:** Public
+- **Use Case:** Test backend connectivity before attempting network requests.
+
+#### Response `200 OK`
+```json
+{
+  "status": "OK",
+  "message": "DreamPay Backend API is running smoothly",
+  "database": "connected",
+  "timestamp": "2026-10-03T12:00:00.000Z"
 }
 ```
 
 ---
 
-## 📑 Complete API Directory for Mobile App
-
-1. [App System Config & Maintenance](#1-app-system-configuration--maintenance)
-2. [Authentication & Profile](#2-authentication--user-profile)
-3. [Membership Plans](#3-membership-plans)
-4. [Gift Codes](#4-gift-codes)
-5. [Deposits](#5-deposits-money-in)
-6. [Withdrawals](#6-withdrawals-money-out)
-7. [Tasks & Daily Earnings](#7-tasks--daily-earnings)
-8. [Wallet & Transaction History](#8-wallet--transaction-history)
-9. [Notifications](#9-notifications)
-
----
-
-## 1. App System Configuration & Maintenance
-
-Always call these endpoints on app splash/startup to verify maintenance mode, force app updates, and fetch payment options.
-
----
-
-### 1.1 Check App Status & Maintenance Mode
-- **URL:** `GET https://gdpebackend.vercel.app/api/app/settings`
-- **Auth:** Not required (Public)
-- **Use Case:** Call on app startup. If `maintenanceMode` is true, display a maintenance screen. If `forceUpdate` is true and installed version < `currentVersion`, block user with an update modal.
+### 4.2 App Settings & Maintenance Check
+- **Endpoint:** `GET /api/app/settings`
+- **Auth:** Public
+- **Use Case:**
+  1. If `maintenanceMode: true`, show full-screen maintenance overlay blocking access.
+  2. If `forceUpdate: true` and app installed version < `currentVersion`, show mandatory update modal linking to Play Store / App Store.
 
 #### Response `200 OK`
 ```json
@@ -82,9 +127,9 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "success": true,
   "data": {
     "maintenanceMode": false,
-    "maintenanceMessage": "App is under scheduled maintenance. Please check back later.",
+    "maintenanceMessage": "The system is currently under maintenance. Please try again later.",
     "forceUpdate": false,
-    "updateMessage": "A new version of the app is available. Please update to continue.",
+    "updateMessage": "A new version of the app is available. Please update to continue using the application.",
     "currentVersion": "1.0.0"
   }
 }
@@ -92,10 +137,10 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-### 1.2 Get Active Payment Methods (Deposit Bank / UPI QR)
-- **URL:** `GET https://gdpebackend.vercel.app/api/payment-methods`
-- **Auth:** Not required (Public)
-- **Use Case:** Display active bank account details and QR code on the Deposit screen so users know where to send money.
+### 4.3 Get Active Deposit Payment Methods (QR & Bank)
+- **Endpoint:** `GET /api/payment-methods`
+- **Auth:** Public
+- **Use Case:** Fetch payment information to display on the **Deposit Screen** (QR code to scan and Bank/UPI details to copy).
 
 #### Response `200 OK`
 ```json
@@ -103,14 +148,16 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "success": true,
   "data": {
     "qrCode": {
-      "imageUrl": "https://gdpebackend.vercel.app/uploads/qr-sample.png",
-      "upiId": "gdpepay@upi"
+      "enabled": true,
+      "imageUrl": "https://res.cloudinary.com/demo/image/upload/v1/dreampay/qr.png"
     },
     "bankAccount": {
-      "accountHolder": "GDPE ENTERPRISE",
-      "accountNumber": "919876543210",
-      "ifscCode": "PYTM0123456",
-      "bankName": "Paytm Payments Bank"
+      "enabled": true,
+      "accountHolder": "DreamPay Services",
+      "bankName": "State Bank of India",
+      "accountNumber": "987654321012",
+      "ifscCode": "SBIN0001234",
+      "upiId": "dreampay@upi"
     }
   }
 }
@@ -118,10 +165,10 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-### 1.3 Get Support Channels & Contacts
-- **URL:** `GET https://gdpebackend.vercel.app/api/contacts`
-- **Auth:** Not required (Public)
-- **Use Case:** Load WhatsApp, Telegram, or Email links in the "Help & Support" screen.
+### 4.4 Get Customer Support Contacts
+- **Endpoint:** `GET /api/contacts`
+- **Auth:** Public
+- **Use Case:** Display active help channels (WhatsApp link, Telegram channel, Helpline, Email) on the "Help & Support" screen.
 
 #### Response `200 OK`
 ```json
@@ -132,15 +179,15 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
     {
       "_id": "6740a1b2c3d4e5f6a7b8c9d0",
       "type": "whatsapp",
-      "label": "Official Support 1",
+      "label": "24/7 WhatsApp Support",
       "value": "+919876543210",
       "isActive": true
     },
     {
       "_id": "6740a1b2c3d4e5f6a7b8c9d1",
       "type": "telegram",
-      "label": "GDPE Channel",
-      "value": "https://t.me/gdpe_official",
+      "label": "Official Announcement Channel",
+      "value": "https://t.me/dreampay_official",
       "isActive": true
     }
   ]
@@ -149,21 +196,21 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-## 2. Authentication & User Profile
+## 5. Authentication & Profile
 
 ---
 
-### 2.1 Register New User
-- **URL:** `POST https://gdpebackend.vercel.app/api/auth/register`
-- **Auth:** Not required (Public)
+### 5.1 Register New Account
+- **Endpoint:** `POST /api/auth/register`
+- **Auth:** Public
 - **Headers:** `Content-Type: application/json`
 
 #### Request Body
 ```json
 {
-  "fullName": "Rahul Sharma",
+  "fullName": "Amit Verma",
   "phoneNumber": "9876543210",
-  "email": "rahul@example.com",
+  "email": "amit@example.com",
   "password": "Password@123"
 }
 ```
@@ -176,12 +223,11 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "data": {
     "id": "6740b2c3d4e5f6a7b8c9d0e1",
-    "fullName": "Rahul Sharma",
-    "email": "rahul@example.com",
+    "fullName": "Amit Verma",
+    "email": "amit@example.com",
     "phoneNumber": "9876543210",
     "role": "user",
     "isEmailVerified": false,
-    "verificationToken": "7b89f3a...",
     "wallet": {
       "balance": 0
     }
@@ -191,15 +237,15 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-### 2.2 Login with Email & Password
-- **URL:** `POST https://gdpebackend.vercel.app/api/auth/login`
-- **Auth:** Not required (Public)
+### 5.2 Login with Password
+- **Endpoint:** `POST /api/auth/login`
+- **Auth:** Public
 - **Headers:** `Content-Type: application/json`
 
 #### Request Body
 ```json
 {
-  "email": "rahul@example.com",
+  "email": "amit@example.com",
   "password": "Password@123"
 }
 ```
@@ -211,8 +257,8 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "data": {
     "id": "6740b2c3d4e5f6a7b8c9d0e1",
-    "fullName": "Rahul Sharma",
-    "email": "rahul@example.com",
+    "fullName": "Amit Verma",
+    "email": "amit@example.com",
     "phoneNumber": "9876543210",
     "role": "user"
   }
@@ -221,15 +267,16 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-### 2.3 Send OTP (Email Login / Forgot Password)
-- **URL:** `POST https://gdpebackend.vercel.app/api/auth/send-otp`
-- **Auth:** Not required (Public)
+### 5.3 Send Login / Verification OTP to Email
+- **Endpoint:** `POST /api/auth/send-otp`
+- **Auth:** Public
 - **Headers:** `Content-Type: application/json`
+- **Use Case:** Passwordless login, forgot password, or email verification.
 
 #### Request Body
 ```json
 {
-  "email": "rahul@example.com"
+  "email": "amit@example.com"
 }
 ```
 
@@ -237,22 +284,22 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 ```json
 {
   "success": true,
-  "message": "OTP sent successfully to email",
-  "otp": "489201"
+  "message": "OTP sent successfully to email"
 }
 ```
+*(Note: In `NODE_ENV=development`, an `otp` field is also returned in the response for easy testing).*
 
 ---
 
-### 2.4 Verify OTP & Authenticate
-- **URL:** `POST https://gdpebackend.vercel.app/api/auth/verify-otp`
-- **Auth:** Not required (Public)
+### 5.4 Verify OTP & Authenticate
+- **Endpoint:** `POST /api/auth/verify-otp`
+- **Auth:** Public
 - **Headers:** `Content-Type: application/json`
 
 #### Request Body
 ```json
 {
-  "email": "rahul@example.com",
+  "email": "amit@example.com",
   "otp": "489201"
 }
 ```
@@ -265,8 +312,8 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "data": {
     "id": "6740b2c3d4e5f6a7b8c9d0e1",
-    "fullName": "Rahul Sharma",
-    "email": "rahul@example.com",
+    "fullName": "Amit Verma",
+    "email": "amit@example.com",
     "role": "user"
   }
 }
@@ -274,9 +321,10 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-### 2.5 Get Current User Profile (with Wallet Balance & Plan)
-- **URL:** `GET https://gdpebackend.vercel.app/api/auth/me`
+### 5.5 Get Current Profile, Wallet & Active Plan
+- **Endpoint:** `GET /api/auth/me`
 - **Auth:** `Bearer <token>`
+- **Use Case:** Call on app open or tab focus to refresh user wallet balance and current membership tier.
 
 #### Response `200 OK`
 ```json
@@ -284,8 +332,8 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "success": true,
   "data": {
     "_id": "6740b2c3d4e5f6a7b8c9d0e1",
-    "fullName": "Rahul Sharma",
-    "email": "rahul@example.com",
+    "fullName": "Amit Verma",
+    "email": "amit@example.com",
     "phoneNumber": "9876543210",
     "role": "user",
     "isBlocked": false,
@@ -293,11 +341,11 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
     "isEmailVerified": true,
     "plan": {
       "_id": "6740c3d4e5f6a7b8c9d0e1f2",
-      "name": "VIP 1",
+      "name": "VIP Silver",
       "amount": 1000
     },
     "wallet": {
-      "balance": 1500,
+      "balance": 2450,
       "pendingBalance": 0
     },
     "createdAt": "2026-09-24T05:00:00.000Z"
@@ -307,16 +355,16 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-### 2.6 Update User Profile
-- **URL:** `PUT https://gdpebackend.vercel.app/api/auth/update-profile`
+### 5.6 Update Profile Details
+- **Endpoint:** `PUT /api/auth/update-profile`
 - **Auth:** `Bearer <token>`
 - **Headers:** `Content-Type: application/json`
 
 #### Request Body
 ```json
 {
-  "fullName": "Rahul S. Sharma",
-  "phoneNumber": "9876543219"
+  "fullName": "Amit Kumar Verma",
+  "phoneNumber": "9876543299"
 }
 ```
 
@@ -327,22 +375,22 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "message": "Profile updated successfully",
   "data": {
     "_id": "6740b2c3d4e5f6a7b8c9d0e1",
-    "fullName": "Rahul S. Sharma",
-    "phoneNumber": "9876543219"
+    "fullName": "Amit Kumar Verma",
+    "phoneNumber": "9876543299"
   }
 }
 ```
 
 ---
 
-## 3. Membership Plans
+## 6. Membership Plans
 
 ---
 
-### 3.1 Get All Active Plans
-- **URL:** `GET https://gdpebackend.vercel.app/api/plans`
-- **Auth:** Not required (Public)
-- **Use Case:** Display plan packages that users can purchase by making a deposit.
+### 6.1 Get Active Membership Plans
+- **Endpoint:** `GET /api/plans`
+- **Auth:** Public
+- **Use Case:** Render investment/VIP package cards on the Plans/VIP screen or Deposit plan picker.
 
 #### Response `200 OK`
 ```json
@@ -352,16 +400,16 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
   "data": [
     {
       "_id": "6740c3d4e5f6a7b8c9d0e1f2",
-      "name": "VIP Starter",
+      "name": "VIP 1 - Starter",
       "amount": 500,
-      "description": "Unlock 5 tasks daily with ₹20 daily earning potential",
+      "description": "Unlock 5 daily tasks with ₹30 daily earning potential",
       "isActive": true
     },
     {
       "_id": "6740c3d4e5f6a7b8c9d0e1f3",
-      "name": "VIP Pro",
+      "name": "VIP 2 - Premium",
       "amount": 1500,
-      "description": "Unlock 15 tasks daily with higher rewards",
+      "description": "Unlock 15 daily tasks with ₹100 daily earning potential",
       "isActive": true
     }
   ]
@@ -370,20 +418,20 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-## 4. Gift Codes
+## 7. Gift Codes
 
 ---
 
-### 4.1 Redeem Gift Code
-- **URL:** `POST https://gdpebackend.vercel.app/api/gift-codes/redeem`
+### 7.1 Redeem Voucher / Promo Code
+- **Endpoint:** `POST /api/gift-codes/redeem`
 - **Auth:** `Bearer <token>`
 - **Headers:** `Content-Type: application/json`
-- **Use Case:** Users enter a promotional or referral voucher code; the amount is credited directly to their wallet.
+- **Use Case:** Users enter a referral or promo code; the reward amount credits directly to their main wallet instantly.
 
 #### Request Body
 ```json
 {
-  "code": "BONUS50"
+  "code": "WELCOME100"
 }
 ```
 
@@ -391,15 +439,15 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 ```json
 {
   "success": true,
-  "message": "Successfully redeemed ₹50!",
+  "message": "Successfully redeemed ₹100!",
   "data": {
-    "code": "BONUS50",
-    "rewardAmount": 50
+    "code": "WELCOME100",
+    "rewardAmount": 100
   }
 }
 ```
 
-#### Error Response (Already used or expired)
+#### Error Response (Already Claimed or Expired)
 ```json
 {
   "success": false,
@@ -409,24 +457,24 @@ Always call these endpoints on app splash/startup to verify maintenance mode, fo
 
 ---
 
-## 5. Deposits (Money In)
+## 8. Deposits (Money In)
 
-Users pay to the QR/Bank account and upload their screenshot proof + UTR reference.
+Users transfer funds via UPI or Net Banking to the admin bank/QR details and upload their screenshot proof along with the bank reference (UTR).
 
 ---
 
-### 5.1 Submit Deposit with Screenshot Proof
-- **URL:** `POST https://gdpebackend.vercel.app/api/deposits`
+### 8.1 Submit Deposit with Screenshot Proof
+- **Endpoint:** `POST /api/deposits`
 - **Auth:** `Bearer <token>`
-- **Content-Type:** `multipart/form-data`
+- **Headers:** `Content-Type: multipart/form-data`
 
-#### Form-Data Fields
-| Key | Type | Description |
-| :--- | :--- | :--- |
-| `amount` | Number/String | Deposit amount (e.g. `1000`) |
-| `transactionRef` | String | Bank UTR / UPI Transaction Reference ID (e.g. `423847291048`) |
-| `planId` | String *(optional)* | Plan ID if depositing for a specific membership plan |
-| `paymentProof` | File (Image) | Screenshot of the payment completion receipt |
+#### Multipart Form Fields
+| Field Key | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `amount` | Number / String | Yes | Amount paid (e.g. `1000`) |
+| `transactionRef` | String | Yes | Bank UTR / UPI Reference Number (e.g. `423847291048`) |
+| `paymentProof` | File / Blob | Yes | Screenshot image of payment completion |
+| `planId` | String | No | ID of chosen VIP Plan (if activating a plan) |
 
 #### Response `201 Created`
 ```json
@@ -437,20 +485,21 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
     "_id": "6740d4e5f6a7b8c9d0e1f2a3",
     "user": "6740b2c3d4e5f6a7b8c9d0e1",
     "plan": "6740c3d4e5f6a7b8c9d0e1f2",
-    "transactionRef": "423847291048",
     "amount": 1000,
-    "paymentProof": "/uploads/1727170000000-payment.jpg",
+    "transactionRef": "423847291048",
+    "paymentProof": "https://res.cloudinary.com/j1fnt9oc/image/upload/v1727950000/dreampay/deposits/proof123.jpg",
     "status": "pending",
-    "createdAt": "2026-09-24T06:00:00.000Z"
+    "createdAt": "2026-10-03T12:00:00.000Z"
   }
 }
 ```
 
 ---
 
-### 5.2 Get User Deposit History
-- **URL:** `GET https://gdpebackend.vercel.app/api/deposits`
+### 8.2 Get User Deposit History
+- **Endpoint:** `GET /api/deposits`
 - **Auth:** `Bearer <token>`
+- **Use Case:** Display deposit passbook / history list.
 
 #### Response `200 OK`
 ```json
@@ -462,42 +511,46 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "_id": "6740d4e5f6a7b8c9d0e1f2a3",
       "amount": 1000,
       "transactionRef": "423847291048",
-      "paymentProof": "/uploads/1727170000000-payment.jpg",
+      "paymentProof": "https://res.cloudinary.com/.../proof123.jpg",
       "status": "approved",
       "plan": {
         "_id": "6740c3d4e5f6a7b8c9d0e1f2",
-        "name": "VIP Starter",
+        "name": "VIP 1 - Starter",
         "amount": 1000
       },
-      "createdAt": "2026-09-24T06:00:00.000Z"
+      "createdAt": "2026-10-03T12:00:00.000Z"
     }
   ]
 }
 ```
 
-> **Deposit Status Values:** `"pending"` | `"approved"` | `"rejected"`
+> **Possible Deposit Status Values:**
+> - `"pending"`: Verification in progress by admin.
+> - `"approved"`: Funds added to wallet & plan activated.
+> - `"rejected"`: Admin rejected (invalid UTR or fake proof).
 
 ---
 
-## 6. Withdrawals (Money Out)
+## 9. Withdrawals (Money Out)
 
 ---
 
-### 6.1 Request Withdrawal
-- **URL:** `POST https://gdpebackend.vercel.app/api/withdrawals`
+### 9.1 Submit Withdrawal Request
+- **Endpoint:** `POST /api/withdrawals`
 - **Auth:** `Bearer <token>`
 - **Headers:** `Content-Type: application/json`
-- **Note:** The requested amount is instantly debited from the user's wallet. If admin rejects it later, the amount is automatically refunded.
+- **Important:** Requested amount is **debited immediately** from the user's wallet to prevent double-spending. If admin later rejects it, the money is automatically refunded back to the wallet.
 
 #### Request Body
 ```json
 {
   "amount": 500,
   "bankDetails": {
-    "accountHolder": "Rahul Sharma",
+    "accountHolderName": "Amit Verma",
+    "bankName": "State Bank of India",
     "accountNumber": "123456789012",
     "ifscCode": "SBIN0001234",
-    "upiId": "rahul@okaxis"
+    "upiId": "amit@okaxis"
   }
 }
 ```
@@ -512,18 +565,19 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
     "user": "6740b2c3d4e5f6a7b8c9d0e1",
     "amount": 500,
     "bankDetails": {
-      "accountHolder": "Rahul Sharma",
+      "accountHolderName": "Amit Verma",
+      "bankName": "State Bank of India",
       "accountNumber": "123456789012",
       "ifscCode": "SBIN0001234",
-      "upiId": "rahul@okaxis"
+      "upiId": "amit@okaxis"
     },
     "status": "pending",
-    "createdAt": "2026-09-24T07:00:00.000Z"
+    "createdAt": "2026-10-03T12:30:00.000Z"
   }
 }
 ```
 
-#### Error Response (Insufficient Balance)
+#### Error Response (Insufficient Wallet Balance)
 ```json
 {
   "success": false,
@@ -533,8 +587,8 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-### 6.2 Get User Withdrawal History
-- **URL:** `GET https://gdpebackend.vercel.app/api/withdrawals`
+### 9.2 Get User Withdrawal History
+- **Endpoint:** `GET /api/withdrawals`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -547,30 +601,30 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "_id": "6740e5f6a7b8c9d0e1f2a3b4",
       "amount": 500,
       "bankDetails": {
-        "accountHolder": "Rahul Sharma",
+        "accountHolderName": "Amit Verma",
         "accountNumber": "123456789012",
         "ifscCode": "SBIN0001234",
-        "upiId": "rahul@okaxis"
+        "upiId": "amit@okaxis"
       },
       "status": "approved",
-      "createdAt": "2026-09-24T07:00:00.000Z"
+      "createdAt": "2026-10-03T12:30:00.000Z"
     }
   ]
 }
 ```
 
-> **Withdrawal Status Values:** `"pending"` | `"approved"` | `"rejected"`
+> **Possible Withdrawal Status Values:** `"pending"` | `"approved"` | `"rejected"`
 
 ---
 
-## 7. Tasks & Daily Earnings
+## 10. Daily Tasks & Earnings
 
 ---
 
-### 7.1 Get All Available Tasks (with User's Submission Status)
-- **URL:** `GET https://gdpebackend.vercel.app/api/tasks`
+### 10.1 Get Active Tasks with User Submission Status
+- **Endpoint:** `GET /api/tasks`
 - **Auth:** `Bearer <token>`
-- **Use Case:** Displays earning task cards in the task screen. Shows whether user has already submitted proof for each task (`mySubmission` field).
+- **Use Case:** Displays earning task cards in the task screen. Includes `mySubmission` so the app knows whether the button should say "Start Task", "In Review", or "Completed".
 
 #### Response `200 OK`
 ```json
@@ -581,38 +635,43 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
     {
       "_id": "6740f6a7b8c9d0e1f2a3b4c5",
       "title": "Subscribe to Official YouTube Channel",
-      "description": "Subscribe to our channel and upload a screenshot showing the subscribed button",
+      "description": "Subscribe to channel, like the video and take a screenshot showing the subscribed state.",
       "rewardAmount": 25,
       "isActive": true,
       "mySubmission": null
     },
     {
       "_id": "6740f6a7b8c9d0e1f2a3b4c6",
-      "title": "Join Telegram Community",
-      "description": "Join our Telegram group and upload screenshot",
+      "title": "Join Telegram Community Channel",
+      "description": "Join our Telegram community and upload screenshot.",
       "rewardAmount": 15,
       "isActive": true,
       "mySubmission": {
         "status": "pending",
-        "submittedAt": "2026-09-24T08:00:00.000Z"
+        "submittedAt": "2026-10-03T13:00:00.000Z"
       }
     }
   ]
 }
 ```
 
+> **`mySubmission` Handling Logic:**
+> - `null`: User has not submitted yet → Show **"Submit Proof"** button.
+> - `mySubmission.status === 'pending'`: Submitted and waiting for review → Show **"Under Review"** tag.
+> - `mySubmission.status === 'approved'`: Approved and credited → Show **"Completed"** green badge.
+
 ---
 
-### 7.2 Submit Proof for a Task
-- **URL:** `POST https://gdpebackend.vercel.app/api/tasks/:id/submit`  
-  *(Replace `:id` with task `_id` e.g., `https://gdpebackend.vercel.app/api/tasks/6740f6a7b8c9d0e1f2a3b4c5/submit`)*
+### 10.2 Submit Task Completion Proof
+- **Endpoint:** `POST /api/tasks/:id/submit`
 - **Auth:** `Bearer <token>`
-- **Content-Type:** `multipart/form-data`
+- **Headers:** `Content-Type: multipart/form-data`
+- **Params:** `:id` = Task `_id` (e.g. `/api/tasks/6740f6a7b8c9d0e1f2a3b4c5/submit`)
 
-#### Form-Data Fields
-| Key | Type | Description |
-| :--- | :--- | :--- |
-| `proof` | File (Image) | Screenshot proof of completing the task |
+#### Multipart Form Fields
+| Field Key | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `proof` | File / Blob | Yes | Screenshot image proving task completion |
 
 #### Response `201 Created`
 ```json
@@ -623,18 +682,18 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
     "_id": "6740a7b8c9d0e1f2a3b4c5d6",
     "task": "6740f6a7b8c9d0e1f2a3b4c5",
     "user": "6740b2c3d4e5f6a7b8c9d0e1",
-    "proof": "/uploads/1727170000000-task-proof.jpg",
+    "proof": "https://res.cloudinary.com/.../task_proof.jpg",
     "rewardAmount": 25,
     "status": "pending",
-    "createdAt": "2026-09-24T08:30:00.000Z"
+    "createdAt": "2026-10-03T13:15:00.000Z"
   }
 }
 ```
 
 ---
 
-### 7.3 Get User's Task Submission History
-- **URL:** `GET https://gdpebackend.vercel.app/api/tasks/submissions`
+### 10.3 Get User's Task Submission History
+- **Endpoint:** `GET /api/tasks/submissions`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -647,13 +706,13 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "_id": "6740a7b8c9d0e1f2a3b4c5d6",
       "rewardAmount": 25,
       "status": "approved",
-      "proof": "/uploads/1727170000000-task-proof.jpg",
+      "proof": "https://res.cloudinary.com/.../task_proof.jpg",
       "task": {
         "_id": "6740f6a7b8c9d0e1f2a3b4c5",
         "title": "Subscribe to Official YouTube Channel",
         "rewardAmount": 25
       },
-      "createdAt": "2026-09-24T08:30:00.000Z"
+      "createdAt": "2026-10-03T13:15:00.000Z"
     }
   ]
 }
@@ -661,12 +720,12 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-## 8. Wallet & Transaction History
+## 11. Wallet & Passbook Ledger
 
 ---
 
-### 8.1 Get Current User Wallet Balance
-- **URL:** `GET https://gdpebackend.vercel.app/api/wallet`
+### 11.1 Get Live Wallet Balance
+- **Endpoint:** `GET /api/wallet`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -676,7 +735,7 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
   "data": {
     "_id": "6740b8c9d0e1f2a3b4c5d6e7",
     "user": "6740b2c3d4e5f6a7b8c9d0e1",
-    "balance": 1825,
+    "balance": 2450,
     "pendingBalance": 0
   }
 }
@@ -684,23 +743,23 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-### 8.2 Get Transaction History (Passbook / Ledger)
-- **URL:** `GET https://gdpebackend.vercel.app/api/wallet/transactions`
+### 11.2 Get Transaction History (Passbook)
+- **Endpoint:** `GET /api/wallet/transactions`
 - **Auth:** `Bearer <token>`
-- **Optional Query Parameters:**
-  - `page` (default: 1)
-  - `limit` (default: 20)
-  - `type` (`credit` or `debit`)
-  - `category` (`deposit`, `withdrawal`, `task_reward`, `gift_code`, `admin_adjustment`)
+- **Query Parameters:**
+  - `page` *(optional, default: 1)*
+  - `limit` *(optional, default: 20)*
+  - `type` *(optional: `credit` | `debit`)*
+  - `category` *(optional: `deposit` | `withdrawal` | `task_reward` | `gift_code` | `admin_adjustment`)*
 
-*Example:* `GET https://gdpebackend.vercel.app/api/wallet/transactions?page=1&limit=10`
+*Example:* `GET /api/wallet/transactions?page=1&limit=15&type=credit`
 
 #### Response `200 OK`
 ```json
 {
   "success": true,
   "count": 3,
-  "total": 3,
+  "total": 12,
   "data": [
     {
       "_id": "6740c9d0e1f2a3b4c5d6e7f8",
@@ -709,7 +768,7 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "category": "task_reward",
       "status": "completed",
       "description": "Task reward: Subscribe to Official YouTube Channel",
-      "createdAt": "2026-09-24T09:00:00.000Z"
+      "createdAt": "2026-10-03T13:20:00.000Z"
     },
     {
       "_id": "6740c9d0e1f2a3b4c5d6e7f9",
@@ -718,7 +777,7 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "category": "withdrawal",
       "status": "completed",
       "description": "Withdrawal request initiated",
-      "createdAt": "2026-09-24T07:00:00.000Z"
+      "createdAt": "2026-10-03T12:30:00.000Z"
     },
     {
       "_id": "6740c9d0e1f2a3b4c5d6e7fa",
@@ -727,7 +786,7 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "category": "deposit",
       "status": "completed",
       "description": "Deposit approved (Ref: 423847291048)",
-      "createdAt": "2026-09-24T06:15:00.000Z"
+      "createdAt": "2026-10-03T12:05:00.000Z"
     }
   ]
 }
@@ -735,12 +794,12 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-## 9. Notifications
+## 12. In-App Notifications
 
 ---
 
-### 9.1 Get User Notifications
-- **URL:** `GET https://gdpebackend.vercel.app/api/notifications`
+### 12.1 Get Notification List
+- **Endpoint:** `GET /api/notifications`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -753,17 +812,17 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
       "_id": "6740d0e1f2a3b4c5d6e7f8a9",
       "title": "Deposit Approved",
       "message": "Your deposit of ₹1000 has been approved and credited to your wallet.",
-      "type": "success",
+      "type": "deposit",
       "isRead": false,
-      "createdAt": "2026-09-24T06:15:00.000Z"
+      "createdAt": "2026-10-03T12:05:00.000Z"
     },
     {
       "_id": "6740d0e1f2a3b4c5d6e7f8aa",
-      "title": "Task Approved",
-      "message": "Your submission was approved! ₹25 has been credited to your wallet.",
-      "type": "success",
+      "title": "Task Reward Credited",
+      "message": "Your task submission was approved! ₹25 added to your wallet.",
+      "type": "task",
       "isRead": true,
-      "createdAt": "2026-09-24T09:00:00.000Z"
+      "createdAt": "2026-10-03T13:20:00.000Z"
     }
   ]
 }
@@ -771,8 +830,8 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-### 9.2 Get Unread Notification Count (For Badges)
-- **URL:** `GET https://gdpebackend.vercel.app/api/notifications/unread-count`
+### 12.2 Get Unread Notification Count (For Tab/Header Badge)
+- **Endpoint:** `GET /api/notifications/unread-count`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -785,8 +844,8 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-### 9.3 Mark All Notifications as Read
-- **URL:** `PATCH https://gdpebackend.vercel.app/api/notifications/read-all`
+### 12.3 Mark All Notifications as Read
+- **Endpoint:** `PATCH /api/notifications/read-all`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -799,9 +858,8 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-### 9.4 Mark Single Notification as Read
-- **URL:** `PATCH https://gdpebackend.vercel.app/api/notifications/:id/read`  
-  *(Replace `:id` with notification `_id`)*
+### 12.4 Mark Single Notification as Read
+- **Endpoint:** `PATCH /api/notifications/:id/read`
 - **Auth:** `Bearer <token>`
 
 #### Response `200 OK`
@@ -814,63 +872,151 @@ Users pay to the QR/Bank account and upload their screenshot proof + UTR referen
 
 ---
 
-## 💻 Sample Code for Mobile App (React Native / Expo)
+## 13. Ready-to-Use React Native / Expo Code Samples
 
-### 1. Axios Instance Setup (`api.ts`)
+Copy and adapt these files into your mobile app (`drmpay_app`) directory for clean, modular code.
+
+---
+
+### 1. Axios API Client (`src/services/apiClient.ts`)
+
 ```typescript
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-export const BASE_URL = 'https://gdpebackend.vercel.app';
+// Dynamically select base URL based on platform & environment
+export const getBaseUrl = (): string => {
+  if (!__DEV__) {
+    return 'https://drmpbackend.vercel.app';
+  }
+  // Local Development URLs
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5003'; // Android Emulator
+  }
+  return 'http://localhost:5003'; // iOS Simulator & Web
+  // For Physical Device via Expo, replace with your Mac's LAN IP:
+  // return 'http://192.168.1.15:5003';
+};
+
+export const BASE_URL = getBaseUrl();
 export const API_URL = `${BASE_URL}/api`;
 
 const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 15000,
+  headers: {
+    Accept: 'application/json',
+  },
 });
 
-// Attach JWT token automatically
-apiClient.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('user_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Automatic JWT Bearer token injection
+apiClient.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem('user_token');
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor for automatic 401 handling
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid -> Clear local session
+      await AsyncStorage.multiRemove(['user_token', 'user_profile']);
+      // Trigger navigation or auth state reset if required
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 export default apiClient;
 ```
 
 ---
 
-### 2. Uploading Deposit Proof (`depositService.ts`)
-```typescript
-import apiClient from './api';
+### 2. Deposit Upload Service (`src/services/depositService.ts`)
 
-export const submitDeposit = async (
-  amount: number,
-  transactionRef: string,
-  imageUri: string,
-  planId?: string
-) => {
+```typescript
+import apiClient from './apiClient';
+
+export interface SubmitDepositParams {
+  amount: number | string;
+  transactionRef: string;
+  imageUri: string;
+  planId?: string;
+}
+
+export const submitDepositProof = async ({
+  amount,
+  transactionRef,
+  imageUri,
+  planId,
+}: SubmitDepositParams) => {
   const formData = new FormData();
   formData.append('amount', String(amount));
-  formData.append('transactionRef', transactionRef);
-  if (planId) formData.append('planId', planId);
+  formData.append('transactionRef', transactionRef.trim());
+  if (planId) {
+    formData.append('planId', planId);
+  }
 
-  // Extract file name and extension
-  const filename = imageUri.split('/').pop() || 'proof.jpg';
+  // Format file object for React Native FormData
+  const filename = imageUri.split('/').pop() || 'deposit_proof.jpg';
   const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : `image/jpeg`;
+  const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
 
   formData.append('paymentProof', {
-    uri: imageUri,
+    uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
     name: filename,
     type,
   } as any);
 
-  // Send request
   const response = await apiClient.post('/deposits', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  return response.data;
+};
+
+export const fetchDepositHistory = async () => {
+  const response = await apiClient.get('/deposits');
+  return response.data;
+};
+```
+
+---
+
+### 3. Task Proof Upload Service (`src/services/taskService.ts`)
+
+```typescript
+import apiClient from './apiClient';
+import { Platform } from 'react-native';
+
+export const fetchTasks = async () => {
+  const response = await apiClient.get('/tasks');
+  return response.data;
+};
+
+export const submitTaskProof = async (taskId: string, imageUri: string) => {
+  const formData = new FormData();
+  const filename = imageUri.split('/').pop() || 'task_proof.jpg';
+  const match = /\.(\w+)$/.exec(filename);
+  const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
+
+  formData.append('proof', {
+    uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+    name: filename,
+    type,
+  } as any);
+
+  const response = await apiClient.post(`/tasks/${taskId}/submit`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -882,13 +1028,35 @@ export const submitDeposit = async (
 
 ---
 
-### 3. Displaying Uploaded Images
-```typescript
-import { BASE_URL } from './api';
+### 4. Image URL Helper (`src/utils/imageUrl.ts`)
 
-export const getFullImageUrl = (path?: string) => {
+```typescript
+import { BASE_URL } from '../services/apiClient';
+
+/**
+ * Normalizes image paths from Cloudinary or local uploads to complete, loadable URLs.
+ */
+export const getFullImageUrl = (path?: string | null): string => {
   if (!path) return '';
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  return `${BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${BASE_URL}${cleanPath}`;
 };
 ```
+
+---
+
+## 14. Mobile Integration Tips & Common Gotchas
+
+1. **Android Emulator Localhost**:
+   - `http://localhost` does **not** point to your development Mac/PC inside the Android emulator. Use `http://10.0.2.2:5003`.
+2. **Android Cleartext (HTTP) Traffic**:
+   - When testing locally over plain `http://`, make sure your `android/app/src/main/AndroidManifest.xml` includes `android:usesCleartextTraffic="true"` inside the `<application>` tag.
+3. **Multipart Upload Boundary**:
+   - When creating `FormData` in React Native, **never** set `Content-Type: multipart/form-data; boundary=...` manually. Simply let Axios omit the manual boundary or set `'Content-Type': 'multipart/form-data'` so the browser/native layer calculates boundaries.
+4. **Token Persistence**:
+   - Store the token securely in `AsyncStorage` (or `expo-secure-store`). Check for existing token on app boot; if present, call `GET /api/auth/me` to validate session and preload user wallet.
+5. **Withdrawal Amount Debit**:
+   - Remember that `POST /api/withdrawals` immediately deducts the amount from the user's available wallet balance. Update your client-side wallet state or refetch `GET /api/wallet` right after a successful withdrawal request.

@@ -168,7 +168,7 @@ To run your existing Postman collection, set your Postman Environment Variables:
 ## 📁 Project Structure
 
 ```
-gdpe_backend/
+drmp_backend/
 ├── src/
 │   ├── config/
 │   │   └── db.js                 # MongoDB Atlas connection

@@ -79,7 +79,8 @@ exports.submitTaskProof = async (req, res, next) => {
       });
     }
 
-    const proofUrl = `/uploads/${req.file.filename}`;
+    // Cloudinary returns the full public URL in req.file.path
+    const proofUrl = req.file.path || `/uploads/${req.file.filename}`;
 
     const submission = await TaskSubmission.create({
       task: taskId,

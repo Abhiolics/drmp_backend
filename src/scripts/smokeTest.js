@@ -472,10 +472,137 @@ const runSmokeTest = async () => {
     if (notifRes.status !== 200) {
       throw new Error(`Notifications check failed: ${JSON.stringify(notifRes.body)}`);
     }
-    console.log(`✅ User received ${notifRes.body.count} automated notifications!`);
+    // 13. Payment Methods & UPI Directory Management (Admin Panel Integration)
+    console.log('\n[13/13] Testing Payment Methods & UPI Directory (Admin & App)...');
+    
+    // Test 13a: Admin adds UPI payment method via /payment/admin/payment-methods
+    const addUpiRes = await makeRequest(
+      {
+        hostname: 'localhost',
+        port: PORT,
+        path: '/payment/admin/payment-methods',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        type: 'upi',
+        upiId: 'dreampay.merchant@icici',
+        upiPayeeName: 'DreamPay Official',
+        enabled: true,
+      }
+    );
+    if (addUpiRes.status !== 201) {
+      throw new Error(`Admin Add UPI failed: ${JSON.stringify(addUpiRes.body)}`);
+    }
+    const upiMethodId = addUpiRes.body.data._id;
+    console.log('✅ Admin added UPI payment method successfully! ID:', upiMethodId);
+
+    // Test 13b: Admin adds Bank Account payment method
+    const addBankRes = await makeRequest(
+      {
+        hostname: 'localhost',
+        port: PORT,
+        path: '/api/payment/admin/payment-methods',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        type: 'bank',
+        accountHolderName: 'DreamPay Technologies',
+        bankName: 'State Bank of India',
+        accountNumber: '98765432101234',
+        ifscCode: 'SBIN0001234',
+        enabled: true,
+      }
+    );
+    if (addBankRes.status !== 201) {
+      throw new Error(`Admin Add Bank Account failed: ${JSON.stringify(addBankRes.body)}`);
+    }
+    const bankMethodId = addBankRes.body.data._id;
+    console.log('✅ Admin added Bank Account payment method successfully! ID:', bankMethodId);
+
+    // Test 13c: Admin lists all payment methods
+    const listPmRes = await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/payment/admin/payment-methods',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    if (listPmRes.status !== 200 || !listPmRes.body.data.paymentMethods) {
+      throw new Error(`Admin List Payment Methods failed: ${JSON.stringify(listPmRes.body)}`);
+    }
+    console.log(`✅ Admin retrieved payment methods list (${listPmRes.body.data.paymentMethods.length} methods configured)`);
+
+    // Test 13d: Admin toggles global payment switch
+    const toggleSwitchRes = await makeRequest(
+      {
+        hostname: 'localhost',
+        port: PORT,
+        path: '/payment/admin/payment-methods/enable',
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      { type: 'upi', enabled: true }
+    );
+    if (toggleSwitchRes.status !== 200) {
+      throw new Error(`Toggle payment switch failed: ${JSON.stringify(toggleSwitchRes.body)}`);
+    }
+    console.log('✅ Admin toggled payment switch successfully!');
+
+    // Test 13e: Admin fetches UPI directory (/upi/admin/all)
+    const upiDirRes = await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/upi/admin/all',
+      method: 'GET',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    if (upiDirRes.status !== 200 || !Array.isArray(upiDirRes.body.data)) {
+      throw new Error(`UPI Directory fetch failed: ${JSON.stringify(upiDirRes.body)}`);
+    }
+    console.log(`✅ Admin UPI Directory query succeeded! Count: ${upiDirRes.body.count}`);
+
+    // Test 13f: Public / mobile client fetches payment methods
+    const publicPmRes = await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/payment-methods',
+      method: 'GET',
+    });
+    if (publicPmRes.status !== 200 || !publicPmRes.body.data.qrCode) {
+      throw new Error(`Public payment methods fetch failed: ${JSON.stringify(publicPmRes.body)}`);
+    }
+    console.log('✅ Public/App payment methods endpoint verified:', publicPmRes.body.data.qrCode.upiId);
+
+    // Test 13g: Admin cleans up test payment methods
+    await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: `/payment/admin/payment-methods/${upiMethodId}`,
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: `/payment/admin/payment-methods/${bankMethodId}`,
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    console.log('✅ Payment methods clean-up successful!');
 
     console.log('\n=============================================');
-    console.log('🎉 ALL 12 END-TO-END SMOKE TESTS PASSED 100%!');
+    console.log('🎉 ALL 13 END-TO-END SMOKE TESTS PASSED 100%!');
     console.log('=============================================\n');
 
     server.close();
