@@ -492,6 +492,7 @@ exports.getMe = async (req, res, next) => {
         isActive: user.isActive,
         isEmailVerified: user.isEmailVerified,
         plan: user.plan,
+        upiId: user.upiId || '',
         referralCode: user.referralCode,
         referralLink,
         referredBy: user.referredBy,

@@ -82,6 +82,11 @@ const userSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
     },
+    upiId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
   },
   {
     timestamps: true,
@@ -96,6 +101,13 @@ userSchema.virtual('wallet', {
   localField: '_id',
   foreignField: 'user',
   justOne: true,
+});
+
+// Virtual for registered UPI addresses
+userSchema.virtual('upis', {
+  ref: 'Upi',
+  localField: '_id',
+  foreignField: 'userId',
 });
 
 const getAdminEmail = () => {

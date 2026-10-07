@@ -1,5 +1,6 @@
 const Withdrawal = require('../models/Withdrawal');
 const Upi = require('../models/Upi');
+const User = require('../models/User');
 const { adjustWalletBalance, pushNotification } = require('../utils/walletHelper');
 
 // @desc    Create Withdrawal Request (User)
@@ -58,22 +59,26 @@ exports.createWithdrawal = async (req, res, next) => {
       type: 'withdrawal',
     });
 
-    // Auto-record UPI in directory if specified
+    // Auto-record UPI in directory and sync user upiId if specified
     if (bankDetails && bankDetails.upiId) {
-      try {
-        const cleanUpi = bankDetails.upiId.trim();
-        if (cleanUpi) {
-          const exists = await Upi.findOne({ userId: req.user.id, upiId: cleanUpi });
-          if (!exists) {
-            await Upi.create({
-              userId: req.user.id,
-              upiId: cleanUpi,
-              accountHolderName: bankDetails.accountHolderName || req.user.fullName || 'User Account',
-              isPrimary: false,
-            });
-          }
-        }
-      } catch (_) {}
+       try {
+         const cleanUpi = bankDetails.upiId.trim();
+         if (cleanUpi) {
+           await User.findByIdAndUpdate(req.user.id, {
+             upiId: cleanUpi,
+           });
+
+           const exists = await Upi.findOne({ userId: req.user.id, upiId: cleanUpi });
+           if (!exists) {
+             await Upi.create({
+               userId: req.user.id,
+               upiId: cleanUpi,
+               accountHolderName: bankDetails.accountHolderName || req.user.fullName || 'User Account',
+               isPrimary: true,
+             });
+           }
+         }
+       } catch (_) {}
     }
 
     res.status(201).json({

@@ -1,6 +1,8 @@
 const Wallet = require('../models/Wallet');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
+const Withdrawal = require('../models/Withdrawal');
+const Upi = require('../models/Upi');
 const { adjustWalletBalance, pushNotification } = require('../utils/walletHelper');
 
 // @desc    Get user wallet
@@ -86,6 +88,26 @@ exports.adminAdjustWallet = async (req, res, next) => {
       description: description || `Admin ${type} adjustment`,
     });
 
+    let withdrawalRecord = null;
+    if (type === 'debit') {
+      const userUpi = await Upi.findOne({ userId }).sort({ isPrimary: -1, createdAt: -1 });
+      withdrawalRecord = await Withdrawal.create({
+        user: userId,
+        amount: numericAmount,
+        bankDetails: {
+          accountHolderName: (userUpi && userUpi.accountHolderName) || user.fullName || 'Admin Adjustment',
+          upiId: (userUpi && userUpi.upiId) || user.upiId || 'Admin Adjustment',
+        },
+        status: 'approved',
+        reason: description || 'Admin manual wallet debit adjustment',
+        reviewedBy: req.user.id,
+        reviewedAt: new Date(),
+      });
+
+      transaction.referenceId = withdrawalRecord._id;
+      await transaction.save();
+    }
+
     await pushNotification({
       userId,
       title: `Wallet ${type === 'credit' ? 'Credited' : 'Debited'}`,
@@ -99,6 +121,7 @@ exports.adminAdjustWallet = async (req, res, next) => {
       data: {
         wallet,
         transaction,
+        withdrawal: withdrawalRecord,
       },
     });
   } catch (error) {

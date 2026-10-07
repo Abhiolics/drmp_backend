@@ -1,4 +1,5 @@
 const Upi = require('../models/Upi');
+const User = require('../models/User');
 const Withdrawal = require('../models/Withdrawal');
 
 // @desc    Get logged in user's UPI addresses
@@ -36,11 +37,17 @@ exports.createUpi = async (req, res, next) => {
       await Upi.updateMany({ userId: req.user._id }, { isPrimary: false });
     }
 
+    const cleanUpi = upiId.trim();
     const upi = await Upi.create({
       userId: req.user._id,
-      upiId: upiId.trim(),
+      upiId: cleanUpi,
       accountHolderName: accountHolderName.trim(),
       isPrimary: isPrimary || false,
+    });
+
+    // Sync upiId to User document directly for immediate admin panel visibility
+    await User.findByIdAndUpdate(req.user._id, {
+      upiId: cleanUpi,
     });
 
     res.status(201).json({
@@ -81,6 +88,11 @@ exports.updateUpi = async (req, res, next) => {
     if (accountHolderName) upi.accountHolderName = accountHolderName.trim();
 
     await upi.save();
+
+    // Sync upiId to User document directly
+    await User.findByIdAndUpdate(req.user._id, {
+      upiId: upi.upiId,
+    });
 
     res.status(200).json({
       success: true,
