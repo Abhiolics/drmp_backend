@@ -1048,7 +1048,124 @@ export const getFullImageUrl = (path?: string | null): string => {
 
 ---
 
-## 14. Mobile Integration Tips & Common Gotchas
+## 13. Refer & Earn (2-Level Commission System)
+
+The backend features a fully automated 2-Level Referral System:
+- **Level 1 (Direct Referrer):** Receives **2%** wallet credit instantly upon approval of their direct referral's deposit.
+- **Level 2 (Indirect Referrer):** Receives **1%** wallet credit instantly upon approval of their second-degree team member's deposit.
+- Immutable ledger records are logged with category `referral_bonus`.
+- Real-time in-app notifications are triggered with type `referral`.
+
+---
+
+### A. User Registration with Referral Code
+- **Method:** `POST`
+- **Endpoint:** `/api/auth/register`
+- **Auth:** Public
+
+#### Request Body
+```json
+{
+  "fullName": "Rahul Sharma",
+  "phoneNumber": "9876543210",
+  "email": "rahul@example.com",
+  "password": "Password@123",
+  "referralCode": "DRM598AB" // Optional (can also pass referCode or refCode)
+}
+```
+
+#### Response (`201 Created`)
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "token": "eyJhbGciOi...",
+  "data": {
+    "id": "6ac671479dbcf51cdf5986a6",
+    "fullName": "Rahul Sharma",
+    "email": "rahul@example.com",
+    "phoneNumber": "9876543210",
+    "role": "user",
+    "referralCode": "DRMA7K2P",
+    "referralLink": "https://drmpbackend.vercel.app/ref/DRMA7K2P",
+    "referredBy": "6ac671469dbcf51cdf598697",
+    "referredByL2": null,
+    "wallet": {
+      "balance": 0
+    }
+  }
+}
+```
+
+---
+
+### B. Get Referral Statistics & Team Dashboard
+- **Method:** `GET`
+- **Endpoint:** `/api/referral/stats`
+- **Auth:** Private (`Bearer <USER_JWT_TOKEN>`)
+
+#### Response (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "referralCode": "DRM598AB",
+    "referralLink": "https://drmpbackend.vercel.app/ref/DRM598AB",
+    "totalCommission": 100,
+    "todayCommission": 100,
+    "yesterdayCommission": 0,
+    "totalMembers": 2,
+    "level1Count": 1,
+    "level2Count": 1,
+    "totalTeamDeposit": 10000,
+    "level1TeamDeposit": 0,
+    "level2TeamDeposit": 10000,
+    "teamMembers": [
+      {
+        "id": "6ac671479dbcf51cdf59869f",
+        "name": "Bob Direct",
+        "email": "bob@example.com",
+        "phone": "9289778155",
+        "level": 1,
+        "totalDeposit": 0,
+        "registrationDate": "2026-10-07T16:20:23.210Z"
+      },
+      {
+        "id": "6ac671479dbcf51cdf5986a6",
+        "name": "Charlie Indirect",
+        "email": "charlie@example.com",
+        "phone": "9399638091",
+        "level": 2,
+        "totalDeposit": 10000,
+        "registrationDate": "2026-10-07T16:20:23.714Z"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### C. Public Referral Landing Page & JSON Lookup
+- **Method:** `GET`
+- **Endpoint:** `/ref/:code` (or `/api/ref/:code`)
+- **Auth:** Public
+- **Browser/Web:** Serves a responsive landing page with inviter name, perks, pre-filled registration form, and mobile app download CTA.
+- **API/Mobile:** Send `Accept: application/json` or query param `?json=true` to receive JSON:
+
+```json
+{
+  "success": true,
+  "data": {
+    "inviterName": "Alice Inviter",
+    "referralCode": "DRM598AB"
+  }
+}
+```
+
+---
+
+## 15. Mobile Integration Tips & Common Gotchas
 
 1. **Android Emulator Localhost**:
    - `http://localhost` does **not** point to your development Mac/PC inside the Android emulator. Use `http://10.0.2.2:5003`.
@@ -1060,3 +1177,4 @@ export const getFullImageUrl = (path?: string | null): string => {
    - Store the token securely in `AsyncStorage` (or `expo-secure-store`). Check for existing token on app boot; if present, call `GET /api/auth/me` to validate session and preload user wallet.
 5. **Withdrawal Amount Debit**:
    - Remember that `POST /api/withdrawals` immediately deducts the amount from the user's available wallet balance. Update your client-side wallet state or refetch `GET /api/wallet` right after a successful withdrawal request.
+

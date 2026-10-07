@@ -2,6 +2,16 @@ const User = require('../models/User');
 const Wallet = require('../models/Wallet');
 const crypto = require('crypto');
 const { sendOtpEmail, sendVerificationEmail } = require('../utils/sendEmail');
+const { generateUniqueReferralCode } = require('../utils/referralHelper');
+
+// Helper to construct base URL for referral links
+const getBaseUrl = (req) => {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, '');
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const host = req.get('host');
+  return `${protocol}://${host}`;
+};
 
 // Helper to resolve exclusive admin email, ignoring legacy admin@example.com
 const getAdminEmail = () => {
@@ -40,16 +50,45 @@ exports.register = async (req, res, next) => {
       });
     }
 
+    // Check for optional referral code
+    const refCodeInput = (
+      req.body.referralCode ||
+      req.body.referCode ||
+      req.body.refCode ||
+      ''
+    ).toString().trim().toUpperCase();
+
+    let referredBy = null;
+    let referredByL2 = null;
+
+    if (refCodeInput) {
+      const referrer = await User.findOne({ referralCode: refCodeInput });
+      if (!referrer) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid referral code provided',
+        });
+      }
+      referredBy = referrer._id;
+      referredByL2 = referrer.referredBy || null;
+    }
+
+    // Auto-generate unique referral code for the new user
+    const referralCode = await generateUniqueReferralCode('DRM');
+
     // Create verification token
     const verificationToken = crypto.randomBytes(20).toString('hex');
 
-    // Create user
+    // Create user with referral hierarchy
     const user = await User.create({
       fullName,
       phoneNumber,
       email: email.toLowerCase(),
       password,
       emailVerificationToken: verificationToken,
+      referralCode,
+      referredBy,
+      referredByL2,
     });
 
     // Create user wallet
@@ -64,6 +103,7 @@ exports.register = async (req, res, next) => {
     );
 
     const token = user.getSignedJwtToken();
+    const referralLink = `${getBaseUrl(req)}/ref/${user.referralCode}`;
 
     res.status(201).json({
       success: true,
@@ -77,6 +117,10 @@ exports.register = async (req, res, next) => {
         role: user.role,
         isEmailVerified: user.isEmailVerified,
         verificationToken,
+        referralCode: user.referralCode,
+        referralLink,
+        referredBy: user.referredBy,
+        referredByL2: user.referredByL2,
         wallet: {
           balance: wallet.balance,
         },
@@ -421,8 +465,16 @@ exports.adminVerifyOtp = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id).populate('plan');
+    let user = await User.findById(req.user.id).populate('plan');
     const wallet = await Wallet.findOne({ user: req.user.id });
+
+    // Auto-generate referral code for older accounts if missing
+    if (user && !user.referralCode) {
+      user.referralCode = await generateUniqueReferralCode('DRM');
+      await user.save({ validateBeforeSave: false });
+    }
+
+    const referralLink = user?.referralCode ? `${getBaseUrl(req)}/ref/${user.referralCode}` : '';
 
     res.status(200).json({
       success: true,
@@ -440,6 +492,10 @@ exports.getMe = async (req, res, next) => {
         isActive: user.isActive,
         isEmailVerified: user.isEmailVerified,
         plan: user.plan,
+        referralCode: user.referralCode,
+        referralLink,
+        referredBy: user.referredBy,
+        referredByL2: user.referredByL2,
         wallet: wallet
           ? {
             balance: wallet.balance,

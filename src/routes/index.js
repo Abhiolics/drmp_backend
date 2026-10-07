@@ -12,6 +12,8 @@ const walletRoutes = require('./walletRoutes');
 const notificationRoutes = require('./notificationRoutes');
 const paymentMethodRoutes = require('./paymentMethodRoutes');
 const upiRoutes = require('./upiRoutes');
+const referralRoutes = require('./referralRoutes');
+const { getReferralLandingPage } = require('../controllers/referralController');
 const { getPublicSettings, getPaymentMethods } = require('../controllers/settingController');
 const { getContacts } = require('../controllers/contactController');
 
@@ -28,6 +30,11 @@ router.use('/notifications', notificationRoutes);
 router.use('/payment', paymentMethodRoutes);
 router.use('/payment-methods', paymentMethodRoutes);
 router.use('/upi', upiRoutes);
+router.use('/referral', referralRoutes);
+router.use('/ref', referralRoutes);
+
+// Public referral landing page route
+router.get('/ref/:code', getReferralLandingPage);
 
 // Public app endpoints from settings folder
 router.get('/app/settings', getPublicSettings);

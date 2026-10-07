@@ -1,6 +1,7 @@
 const Deposit = require('../models/Deposit');
 const User = require('../models/User');
 const { adjustWalletBalance, pushNotification } = require('../utils/walletHelper');
+const { distributeReferralCommission } = require('../utils/referralHelper');
 
 // @desc    Create Deposit (User)
 // @route   POST /api/deposits or /deposits
@@ -149,6 +150,18 @@ exports.approveDeposit = async (req, res, next) => {
       message: `Your deposit of ₹${deposit.amount} has been approved and credited to your wallet.`,
       type: 'success',
     });
+
+    // Trigger 2-Level referral commission distribution (L1: 2%, L2: 1%)
+    try {
+      await distributeReferralCommission(
+        deposit.user,
+        deposit.amount,
+        deposit._id,
+        deposit.transactionRef
+      );
+    } catch (refErr) {
+      console.error('[Referral Commission Error]:', refErr.message);
+    }
 
     res.status(200).json({
       success: true,
