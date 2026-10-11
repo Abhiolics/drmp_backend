@@ -30,10 +30,13 @@ const generateUniqueReferralCode = async (prefix = 'DRM') => {
 };
 
 /**
- * Reusable function to distribute 2-Level referral commission
+ * Reusable function to distribute commission on approved order / deposit:
  *
- * Level 1 (Direct Referrer): 2% of the amount credited to wallet
- * Level 2 (Indirect Referrer): 1% of the amount credited to wallet
+ * 1. User Self Commission: 4% of the order amount credited to wallet
+ * 2. Level 1 (Direct Referrer): 2% of the order amount credited to wallet
+ * 3. Level 2 (Indirect Referrer): 1% of the order amount credited to wallet
+ *
+ * All three get immutable credit entries logged in the transactions table.
  *
  * Can be called with positional arguments:
  *   distributeReferralCommission(buyerId, amount, referenceId, transactionRef)
@@ -83,6 +86,7 @@ const distributeReferralCommission = async (
     }
 
     const distributionResult = {
+      self: null,
       level1: null,
       level2: null,
     };
@@ -90,7 +94,38 @@ const distributeReferralCommission = async (
     const buyerDisplayName = buyer.fullName || buyer.email || 'Team Member';
     const depositRefLabel = transactionRef || (referenceId ? referenceId.toString().slice(-6) : '');
 
-    // Level 1: Direct Referrer (2%)
+    // 1. User's own order: Self Commission (4%)
+    const selfCommission = Number((numericAmount * 0.04).toFixed(2));
+    if (selfCommission > 0) {
+      const selfDescription = `Order commission (4%) for deposit${
+        depositRefLabel ? ` (Ref: ${depositRefLabel})` : ''
+      }`;
+
+      await adjustWalletBalance({
+        userId: buyer._id,
+        amount: selfCommission,
+        type: 'credit',
+        category: 'commission',
+        description: selfDescription,
+        referenceId: referenceId || null,
+      });
+
+      await pushNotification({
+        userId: buyer._id,
+        title: 'Order Commission Received 🎉',
+        message: `You earned ₹${selfCommission} (4% order commission) on your approved deposit of ₹${numericAmount}.`,
+        type: 'commission',
+      });
+
+      distributionResult.self = {
+        userId: buyer._id,
+        name: buyerDisplayName,
+        amount: selfCommission,
+        rate: '4%',
+      };
+    }
+
+    // 2. Level 1: Direct Referrer (2%)
     if (buyer.referredBy) {
       const l1Referrer = await User.findById(buyer.referredBy);
       if (l1Referrer) {
@@ -126,7 +161,7 @@ const distributeReferralCommission = async (
       }
     }
 
-    // Level 2: Indirect Grandparent Referrer (1%)
+    // 3. Level 2: Indirect Grandparent Referrer (1%)
     if (buyer.referredByL2) {
       const l2Referrer = await User.findById(buyer.referredByL2);
       if (l2Referrer) {
@@ -164,11 +199,11 @@ const distributeReferralCommission = async (
 
     return {
       success: true,
-      message: 'Referral commission distributed successfully',
+      message: 'Commission distributed successfully',
       data: distributionResult,
     };
   } catch (error) {
-    console.error('[Referral Commission Distribution Error]:', error);
+    console.error('[Commission Distribution Error]:', error);
     return {
       success: false,
       message: error.message,

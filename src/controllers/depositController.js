@@ -151,7 +151,7 @@ exports.approveDeposit = async (req, res, next) => {
       type: 'success',
     });
 
-    // Trigger 2-Level referral commission distribution (L1: 2%, L2: 1%)
+    // Trigger commission distribution (Self: 4%, Level 1: 2%, Level 2: 1%)
     try {
       await distributeReferralCommission(
         deposit.user,
@@ -160,7 +160,7 @@ exports.approveDeposit = async (req, res, next) => {
         deposit.transactionRef
       );
     } catch (refErr) {
-      console.error('[Referral Commission Error]:', refErr.message);
+      console.error('[Commission Distribution Error]:', refErr.message);
     }
 
     res.status(200).json({
