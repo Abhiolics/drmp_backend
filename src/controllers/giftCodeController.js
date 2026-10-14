@@ -225,3 +225,48 @@ exports.redeemGiftCode = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get active gift codes for users
+// @route   GET /api/gift-codes or /gift-codes
+// @access  Private
+exports.getActiveGiftCodes = async (req, res, next) => {
+  try {
+    const currentDate = new Date();
+    const query = {
+      isActive: true,
+      expiryDate: { $gte: currentDate },
+      $expr: { $lt: ["$usedCount", "$maxUsers"] },
+    };
+
+    const giftCodes = await GiftCode.find(query)
+      .select("code rewardAmount maxUsers usedCount expiryDate createdAt usedBy")
+      .sort({ createdAt: -1 });
+
+    const userId = req.user ? req.user.id : null;
+
+    const data = giftCodes.map((gc) => {
+      const isClaimedByMe = userId
+        ? gc.usedBy.some((u) => u.user && u.user.toString() === userId)
+        : false;
+
+      return {
+        _id: gc._id,
+        code: gc.code,
+        rewardAmount: gc.rewardAmount,
+        maxUsers: gc.maxUsers,
+        usedCount: gc.usedCount,
+        expiryDate: gc.expiryDate,
+        createdAt: gc.createdAt,
+        isClaimedByMe,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
