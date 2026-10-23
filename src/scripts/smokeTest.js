@@ -500,7 +500,32 @@ const runSmokeTest = async () => {
     const upiMethodId = addUpiRes.body.data._id;
     console.log('✅ Admin added UPI payment method successfully! ID:', upiMethodId);
 
-    // Test 13b: Admin adds Bank Account payment method
+    // Test 13b: Admin adds second UPI payment method to test rotation
+    const addUpiRes2 = await makeRequest(
+      {
+        hostname: 'localhost',
+        port: PORT,
+        path: '/payment/admin/payment-methods',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      {
+        type: 'upi',
+        upiId: 'dreampay.merchant2@hdfc',
+        upiPayeeName: 'DreamPay Merchant 2',
+        enabled: true,
+      }
+    );
+    if (addUpiRes2.status !== 201) {
+      throw new Error(`Admin Add UPI 2 failed: ${JSON.stringify(addUpiRes2.body)}`);
+    }
+    const upiMethodId2 = addUpiRes2.body.data._id;
+    console.log('✅ Admin added 2nd UPI payment method successfully! ID:', upiMethodId2);
+
+    // Test 13c: Admin adds Bank Account payment method
     const addBankRes = await makeRequest(
       {
         hostname: 'localhost',
@@ -527,7 +552,7 @@ const runSmokeTest = async () => {
     const bankMethodId = addBankRes.body.data._id;
     console.log('✅ Admin added Bank Account payment method successfully! ID:', bankMethodId);
 
-    // Test 13c: Admin lists all payment methods
+    // Test 13d: Admin lists all payment methods
     const listPmRes = await makeRequest({
       hostname: 'localhost',
       port: PORT,
@@ -538,9 +563,9 @@ const runSmokeTest = async () => {
     if (listPmRes.status !== 200 || !listPmRes.body.data.paymentMethods) {
       throw new Error(`Admin List Payment Methods failed: ${JSON.stringify(listPmRes.body)}`);
     }
-    console.log(`✅ Admin retrieved payment methods list (${listPmRes.body.data.paymentMethods.length} methods configured)`);
+    console.log(`✅ Admin retrieved payment methods list (${listPmRes.body.data.paymentMethods.length} methods configured, active UPIs: ${listPmRes.body.data.activeUpiCount})`);
 
-    // Test 13d: Admin toggles global payment switch
+    // Test 13e: Admin toggles global payment switch
     const toggleSwitchRes = await makeRequest(
       {
         hostname: 'localhost',
@@ -559,7 +584,7 @@ const runSmokeTest = async () => {
     }
     console.log('✅ Admin toggled payment switch successfully!');
 
-    // Test 13e: Admin fetches UPI directory (/upi/admin/all)
+    // Test 13f: Admin fetches UPI directory (/upi/admin/all)
     const upiDirRes = await makeRequest({
       hostname: 'localhost',
       port: PORT,
@@ -572,23 +597,43 @@ const runSmokeTest = async () => {
     }
     console.log(`✅ Admin UPI Directory query succeeded! Count: ${upiDirRes.body.count}`);
 
-    // Test 13f: Public / mobile client fetches payment methods
-    const publicPmRes = await makeRequest({
+    // Test 13g: App fetches payment methods across consecutive requests to verify UPI rotation!
+    const publicPmRes1 = await makeRequest({
       hostname: 'localhost',
       port: PORT,
       path: '/api/payment-methods',
       method: 'GET',
     });
-    if (publicPmRes.status !== 200 || !publicPmRes.body.data.qrCode) {
-      throw new Error(`Public payment methods fetch failed: ${JSON.stringify(publicPmRes.body)}`);
+    if (publicPmRes1.status !== 200 || !publicPmRes1.body.data.qrCode) {
+      throw new Error(`Public payment methods fetch 1 failed: ${JSON.stringify(publicPmRes1.body)}`);
     }
-    console.log('✅ Public/App payment methods endpoint verified:', publicPmRes.body.data.qrCode.upiId);
 
-    // Test 13g: Admin cleans up test payment methods
+    const publicPmRes2 = await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: '/api/payment-methods',
+      method: 'GET',
+    });
+    if (publicPmRes2.status !== 200 || !publicPmRes2.body.data.qrCode) {
+      throw new Error(`Public payment methods fetch 2 failed: ${JSON.stringify(publicPmRes2.body)}`);
+    }
+
+    const upiRotated1 = publicPmRes1.body.data.qrCode.upiId;
+    const upiRotated2 = publicPmRes2.body.data.qrCode.upiId;
+    console.log(`✅ Multi-UPI Rotation verified! Request 1 got: ${upiRotated1} | Request 2 got: ${upiRotated2}`);
+
+    // Test 13h: Admin cleans up test payment methods
     await makeRequest({
       hostname: 'localhost',
       port: PORT,
       path: `/payment/admin/payment-methods/${upiMethodId}`,
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    await makeRequest({
+      hostname: 'localhost',
+      port: PORT,
+      path: `/payment/admin/payment-methods/${upiMethodId2}`,
       method: 'DELETE',
       headers: { Authorization: `Bearer ${adminToken}` },
     });

@@ -1,5 +1,6 @@
 const Deposit = require('../models/Deposit');
 const User = require('../models/User');
+const PaymentMethod = require('../models/PaymentMethod');
 const { adjustWalletBalance, pushNotification } = require('../utils/walletHelper');
 const { distributeReferralCommission } = require('../utils/referralHelper');
 
@@ -8,7 +9,7 @@ const { distributeReferralCommission } = require('../utils/referralHelper');
 // @access  Private
 exports.createDeposit = async (req, res, next) => {
   try {
-    const { planId, transactionRef, amount } = req.body;
+    const { planId, transactionRef, amount, assignedUpiId, upiId, paymentMethodId } = req.body;
 
     if (!transactionRef || !amount) {
       return res.status(400).json({
@@ -27,12 +28,26 @@ exports.createDeposit = async (req, res, next) => {
     // Cloudinary returns the full public URL in req.file.path
     const proofUrl = req.file.path;
 
+    let finalUpi = (assignedUpiId || upiId || '').trim();
+    let finalPaymentMethod = paymentMethodId || null;
+
+    // Fallback: If app did not send upiId explicitly, link to the most recently rotated active UPI
+    if (!finalUpi) {
+      const recentUpi = await PaymentMethod.findOne({ type: 'upi', enabled: true }).sort({ lastUsedAt: -1 });
+      if (recentUpi) {
+        finalUpi = recentUpi.upiId;
+        finalPaymentMethod = recentUpi._id;
+      }
+    }
+
     const deposit = await Deposit.create({
       user: req.user.id,
       plan: planId || null,
       transactionRef,
       amount: Number(amount),
       paymentProof: proofUrl,
+      assignedUpiId: finalUpi,
+      paymentMethod: finalPaymentMethod,
       status: 'pending',
     });
 
@@ -60,6 +75,7 @@ exports.getUserDeposits = async (req, res, next) => {
   try {
     const deposits = await Deposit.find({ user: req.user.id })
       .populate('plan', 'name amount')
+      .populate('paymentMethod', 'upiId upiPayeeName type qrCodeUrl')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -85,6 +101,7 @@ exports.getAllDepositsAdmin = async (req, res, next) => {
     const deposits = await Deposit.find(query)
       .populate('user', 'fullName email phoneNumber')
       .populate('plan', 'name amount')
+      .populate('paymentMethod', 'upiId upiPayeeName type qrCodeUrl')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(Number(limit));

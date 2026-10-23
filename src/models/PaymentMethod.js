@@ -56,6 +56,19 @@ const paymentMethodSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Rotation & load balancing fields
+    usageCount: {
+      type: Number,
+      default: 0,
+    },
+    lastUsedAt: {
+      type: Date,
+      default: () => new Date(),
+    },
+    dailyLimit: {
+      type: Number,
+      default: 0, // 0 = unlimited
+    },
   },
   {
     timestamps: true,

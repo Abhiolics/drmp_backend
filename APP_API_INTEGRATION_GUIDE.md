@@ -149,7 +149,11 @@ Call these endpoints when the app initializes (Splash Screen or App Launch) befo
   "data": {
     "qrCode": {
       "enabled": true,
-      "imageUrl": "https://res.cloudinary.com/demo/image/upload/v1/dreampay/qr.png"
+      "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi%3A...",
+      "upiId": "merchant1@icici",
+      "upiPayeeName": "DreamPay Official",
+      "methodId": "6740a1b2c3d4e5f6a7b8c9d0",
+      "upiIntentUrl": "upi://pay?pa=merchant1@icici&pn=DreamPay%20Official&cu=INR"
     },
     "bankAccount": {
       "enabled": true,
@@ -157,11 +161,20 @@ Call these endpoints when the app initializes (Splash Screen or App Launch) befo
       "bankName": "State Bank of India",
       "accountNumber": "987654321012",
       "ifscCode": "SBIN0001234",
-      "upiId": "dreampay@upi"
+      "upiId": "merchant1@icici"
+    },
+    "assignedUpi": {
+      "id": "6740a1b2c3d4e5f6a7b8c9d0",
+      "upiId": "merchant1@icici",
+      "upiPayeeName": "DreamPay Official",
+      "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=...",
+      "upiIntentUrl": "upi://pay?pa=merchant1@icici&pn=DreamPay%20Official&cu=INR"
     }
   }
 }
 ```
+> [!NOTE]
+> **Dynamic UPI Rotation:** Backend automatically rotates across all active admin UPI IDs using atomic round-robin rotation per request/order. The QR code image and UPI Intent URL are dynamically generated to match the exact assigned UPI ID.
 
 ---
 
@@ -475,6 +488,7 @@ Users transfer funds via UPI or Net Banking to the admin bank/QR details and upl
 | `transactionRef` | String | Yes | Bank UTR / UPI Reference Number (e.g. `423847291048`) |
 | `paymentProof` | File / Blob | Yes | Screenshot image of payment completion |
 | `planId` | String | No | ID of chosen VIP Plan (if activating a plan) |
+| `assignedUpiId` | String | No | The UPI ID shown to user on screen (e.g. `merchant1@icici`) |
 
 #### Response `201 Created`
 ```json
@@ -488,6 +502,7 @@ Users transfer funds via UPI or Net Banking to the admin bank/QR details and upl
     "amount": 1000,
     "transactionRef": "423847291048",
     "paymentProof": "https://res.cloudinary.com/j1fnt9oc/image/upload/v1727950000/dreampay/deposits/proof123.jpg",
+    "assignedUpiId": "merchant1@icici",
     "status": "pending",
     "createdAt": "2026-10-03T12:00:00.000Z"
   }

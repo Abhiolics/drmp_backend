@@ -86,6 +86,7 @@ exports.getPaymentMethodsAdmin = async (req, res, next) => {
 
     const methods = await PaymentMethod.find().sort({ createdAt: -1 });
 
+    const activeUpiCount = methods.filter((m) => m.type === 'upi' && m.enabled).length;
     const isUpiEnabled = settings.isUpiEnabled ?? settings.paymentMethods?.qrCode?.enabled ?? true;
     const isBankEnabled = settings.isBankEnabled ?? settings.paymentMethods?.bankAccount?.enabled ?? true;
 
@@ -94,6 +95,7 @@ exports.getPaymentMethodsAdmin = async (req, res, next) => {
       data: {
         isUpiEnabled,
         isBankEnabled,
+        activeUpiCount,
         paymentMethods: methods,
       },
     });
@@ -119,7 +121,9 @@ exports.addPaymentMethod = async (req, res, next) => {
       ifscCode,
       ifsc,
       qrCodeUrl,
+      dailyLimit,
       enabled,
+      upis,
     } = req.body;
 
     if (!type || !['upi', 'bank'].includes(type.toLowerCase())) {
@@ -135,6 +139,37 @@ exports.addPaymentMethod = async (req, res, next) => {
     let newMethod;
 
     if (normalizedType === 'upi') {
+      // Support batch addition of multiple UPI IDs
+      if (Array.isArray(upis) && upis.length > 0) {
+        const batchDocs = upis
+          .map((item) => ({
+            type: 'upi',
+            upiId: (item.upiId || '').trim(),
+            upiPayeeName: (item.upiPayeeName || item.payeeName || 'Admin Payee').trim(),
+            qrCodeUrl: (item.qrCodeUrl || '').trim(),
+            dailyLimit: Number(item.dailyLimit) || 0,
+            enabled: item.enabled !== undefined ? item.enabled === true || item.enabled === 'true' : true,
+            lastUsedAt: new Date(),
+          }))
+          .filter((item) => item.upiId.length > 0);
+
+        if (batchDocs.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No valid UPI IDs provided in batch array',
+          });
+        }
+
+        const insertedMethods = await PaymentMethod.insertMany(batchDocs);
+        await syncSettings();
+
+        return res.status(201).json({
+          success: true,
+          message: `${insertedMethods.length} UPI payment methods added successfully`,
+          data: insertedMethods,
+        });
+      }
+
       const finalUpi = (upiId || '').trim();
       const finalPayee = (upiPayeeName || payeeName || accountHolderName || accountHolder || '').trim();
 
@@ -150,7 +185,9 @@ exports.addPaymentMethod = async (req, res, next) => {
         upiId: finalUpi,
         upiPayeeName: finalPayee || 'Admin Payee',
         qrCodeUrl: (qrCodeUrl || '').trim(),
+        dailyLimit: Number(dailyLimit) || 0,
         enabled: isEnabled,
+        lastUsedAt: new Date(),
       });
     } else {
       const finalHolder = (accountHolderName || accountHolder || '').trim();
@@ -223,6 +260,8 @@ exports.updatePaymentMethod = async (req, res, next) => {
         method.upiPayeeName = (upiPayeeName || payeeName).trim();
       }
       if (qrCodeUrl !== undefined) method.qrCodeUrl = qrCodeUrl.trim();
+      if (req.body.dailyLimit !== undefined) method.dailyLimit = Number(req.body.dailyLimit) || 0;
+      if (req.body.resetUsage === true) method.usageCount = 0;
     } else if (method.type === 'bank') {
       if (accountHolderName !== undefined || accountHolder !== undefined) {
         method.accountHolderName = (accountHolderName || accountHolder).trim();
@@ -322,7 +361,7 @@ exports.enablePaymentMethod = async (req, res, next) => {
   }
 };
 
-// @desc    Get active payment methods for mobile clients and public apps
+// @desc    Get active payment methods for mobile clients and public apps (with automatic UPI rotation per order/request)
 // @route   GET /api/payment/payment-methods or /api/payment-methods
 // @access  Public
 exports.getPaymentMethodsPublic = async (req, res, next) => {
@@ -330,10 +369,16 @@ exports.getPaymentMethodsPublic = async (req, res, next) => {
     const settings = await Setting.getSettings();
     await ensureInitialMethods(settings);
 
-    const activeUpi = await PaymentMethod.findOne({ type: 'upi', enabled: true }).sort({
-      updatedAt: -1,
-      createdAt: -1,
-    });
+    // Atomically find the active UPI with oldest lastUsedAt (fair round-robin rotation)
+    // and update its lastUsedAt timestamp and usageCount
+    const activeUpi = await PaymentMethod.findOneAndUpdate(
+      { type: 'upi', enabled: true },
+      {
+        $set: { lastUsedAt: new Date() },
+        $inc: { usageCount: 1 },
+      },
+      { sort: { lastUsedAt: 1, createdAt: 1 }, new: true }
+    );
 
     const activeBank = await PaymentMethod.findOne({ type: 'bank', enabled: true }).sort({
       updatedAt: -1,
@@ -344,12 +389,31 @@ exports.getPaymentMethodsPublic = async (req, res, next) => {
     const isBankEnabled = settings.isBankEnabled ?? settings.paymentMethods?.bankAccount?.enabled ?? true;
 
     const upiId = activeUpi?.upiId || settings.paymentMethods?.qrCode?.upiId || settings.paymentMethods?.bankAccount?.upiId || '';
+    const upiPayeeName = activeUpi?.upiPayeeName || settings.paymentMethods?.bankAccount?.accountHolder || 'DreamPay Official';
+
+    // Build QR Code Image: custom uploaded URL, or dynamically generated standard UPI QR for this specific rotated UPI ID
+    let qrImageUrl = activeUpi?.qrCodeUrl || '';
+    if (!qrImageUrl && settings.paymentMethods?.qrCode?.imageUrl) {
+      qrImageUrl = settings.paymentMethods.qrCode.imageUrl;
+    }
+    if (!qrImageUrl && upiId) {
+      qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+        `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiPayeeName)}&cu=INR`
+      )}`;
+    }
+
+    const upiIntentUrl = upiId
+      ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiPayeeName)}&cu=INR`
+      : '';
 
     const publicData = {
       qrCode: {
         enabled: isUpiEnabled,
-        imageUrl: activeUpi?.qrCodeUrl || settings.paymentMethods?.qrCode?.imageUrl || '',
+        imageUrl: qrImageUrl,
         upiId,
+        upiPayeeName,
+        methodId: activeUpi?._id || null,
+        upiIntentUrl,
       },
       bankAccount: {
         enabled: isBankEnabled,
@@ -358,6 +422,13 @@ exports.getPaymentMethodsPublic = async (req, res, next) => {
         accountNumber: activeBank?.accountNumber || settings.paymentMethods?.bankAccount?.accountNumber || '',
         ifscCode: activeBank?.ifscCode || settings.paymentMethods?.bankAccount?.ifscCode || '',
         upiId,
+      },
+      assignedUpi: {
+        id: activeUpi?._id || null,
+        upiId,
+        upiPayeeName,
+        imageUrl: qrImageUrl,
+        upiIntentUrl,
       },
     };
 

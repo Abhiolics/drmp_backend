@@ -26,6 +26,21 @@ const depositSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please upload payment proof image'],
     },
+    assignedUpiId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    assignedPayeeName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    paymentMethod: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PaymentMethod',
+      default: null,
+    },
     status: {
       type: String,
       enum: ['pending', 'approved', 'rejected'],
